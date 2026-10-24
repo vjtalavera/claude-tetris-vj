@@ -95,7 +95,7 @@ Después abre `http://localhost:8000` en el navegador.
 
 - **Completa líneas para sumar puntos.** Cuando una fila queda llena de bloques, se elimina y ganas puntos (100 / 300 / 500 / 800 según elimines 1, 2, 3 o 4 líneas a la vez, multiplicado por el nivel). Cada 10 líneas subes de nivel y la caída se acelera.
 - **Cuándo termina la partida.** El juego acaba (**Game Over**) cuando una pieza nueva no cabe al aparecer en la parte superior del tablero porque los bloques apilados llegan hasta arriba. Se muestra tu puntuación final.
-- **Reiniciar.** Pulsa el botón **Reiniciar** para empezar una partida nueva en cualquier momento, tanto durante el juego como tras un Game Over.
+- **Reiniciar.** El botón **Reiniciar** está dentro del overlay, así que solo se ve al pausar con `P` o cuando aparece el Game Over. Púlsalo para empezar una partida nueva.
 
 ---
 
