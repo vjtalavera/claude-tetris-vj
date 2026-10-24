@@ -19,6 +19,7 @@ Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canv
     - [Opción 1: abrir el archivo directamente](#opción-1-abrir-el-archivo-directamente)
     - [Opción 2: servidor local (recomendado)](#opción-2-servidor-local-recomendado)
   - [Controles](#controles)
+  - [Cómo se juega](#cómo-se-juega)
   - [Cómo funciona](#cómo-funciona)
     - [1. `index.html`](#1-indexhtml)
     - [2. `style.css`](#2-stylecss)
@@ -87,6 +88,14 @@ Después abre `http://localhost:8000` en el navegador.
 | `↓`       | Soft drop (bajar más rápido)      |
 | `Espacio` | Hard drop (caída instantánea)     |
 | `P`       | Pausar / reanudar                 |
+
+---
+
+## Cómo se juega
+
+- **Completa líneas para sumar puntos.** Cuando una fila queda llena de bloques, se elimina y ganas puntos (100 / 300 / 500 / 800 según elimines 1, 2, 3 o 4 líneas a la vez, multiplicado por el nivel). Cada 10 líneas subes de nivel y la caída se acelera.
+- **Cuándo termina la partida.** El juego acaba (**Game Over**) cuando una pieza nueva no cabe al aparecer en la parte superior del tablero porque los bloques apilados llegan hasta arriba. Se muestra tu puntuación final.
+- **Reiniciar.** El botón **Reiniciar** está dentro del overlay, así que solo se ve al pausar con `P` o cuando aparece el Game Over. Púlsalo para empezar una partida nueva.
 
 ---
 
