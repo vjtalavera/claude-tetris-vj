@@ -72,18 +72,31 @@ jobs:
 
             Devuelve:
             - `labels`: nombres exactos de las etiquetas elegidas.
-            - `diagnosis`: diagnóstico en Markdown y en español, pensado para que un desarrollador
+            - `diagnosis`: diagnóstico en GitHub Flavored Markdown y en español, pensado para que un desarrollador
               implemente después la solución, con estas secciones (encabezados `###`):
               Resumen · Clasificación (tipo y por qué de cada etiqueta) · Posibles duplicados (#n o "Ninguno") ·
-              Diagnóstico (causa probable, archivos y funciones implicadas con `archivo:línea`) ·
+              Diagnóstico (causa probable, archivos y funciones implicadas, enlazadas como se indica abajo) ·
               Propuesta de solución (pasos concretos) · Riesgos y acoplamientos (revisa los de `CLAUDE.md`) ·
               Criterios de aceptación / verificación manual · Preguntas abiertas · Complejidad estimada (baja/media/alta).
               Si el issue es ambiguo o no tiene información suficiente, dilo y concreta qué falta.
               No menciones a usuarios con @.
+
+            Formato de `diagnosis` (obligatorio): se publica tal cual como comentario de GitHub, así que
+            debe ser GitHub Flavored Markdown válido que GitHub renderice correctamente:
+            - Secciones solo con `###`; no uses `#` ni `##` (el encabezado del comentario lo pone el workflow)
+              y no envuelvas la respuesta entera en un bloque de código.
+            - Listas con `-` o `1.`; los criterios de aceptación como checklist `- [ ]`.
+            - Código, funciones, archivos, teclas y colores entre backticks; fragmentos de código en bloques
+              con triple backtick y lenguaje (`js`, `html`, `css`).
+            - Referencias a código como enlaces permanentes, p. ej.
+              [game.js:14](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/game.js#L14)
+              y para rangos `#L77-L87`.
+            - Issues como `#n` (GitHub los enlaza solo).
+            - Tablas GFM solo si aportan claridad; no uses HTML.
           claude_args: |
             --max-turns 20
             --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh search issues:*),Bash(gh label list:*)"
-            --json-schema '{"type":"object","properties":{"labels":{"type":"array","items":{"type":"string"}},"diagnosis":{"type":"string"}},"required":["labels","diagnosis"],"additionalProperties":false}'
+            --json-schema '{"type":"object","properties":{"labels":{"type":"array","items":{"type":"string"}},"diagnosis":{"type":"string","description":"Diagnóstico en GitHub Flavored Markdown, en español, listo para publicarse como comentario de GitHub"}},"required":["labels","diagnosis"],"additionalProperties":false}'
 
   apply:
     needs: analyze
