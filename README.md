@@ -18,6 +18,7 @@ Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canv
   - [Cómo ejecutar el juego](#cómo-ejecutar-el-juego)
     - [Opción 1: abrir el archivo directamente](#opción-1-abrir-el-archivo-directamente)
     - [Opción 2: servidor local (recomendado)](#opción-2-servidor-local-recomendado)
+    - [Tests](#tests)
   - [Controles](#controles)
   - [Cómo se juega](#cómo-se-juega)
   - [Cómo funciona](#cómo-funciona)
@@ -77,6 +78,14 @@ php -S localhost:8000
 ```
 
 Después abre `http://localhost:8000` en el navegador.
+
+### Tests
+
+Sin dependencias, con el runner integrado de Node.js:
+
+```bash
+node --test
+```
 
 ---
 
@@ -171,6 +180,8 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 ├── index.html      # Estructura del DOM y canvas
 ├── style.css       # Estilos del juego (dark theme)
 ├── game.js         # Toda la lógica del Tetris (~300 líneas)
+├── tests/
+│   └── game.test.mjs  # Tests sin dependencias (node --test)
 └── README.md
 ```
 

@@ -50,5 +50,6 @@ jobs:
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          # Permite ejecutar los tests (ver CLAUDE.md, sección Verificación) antes de dar el trabajo por hecho
+          claude_args: '--allowedTools "Bash(node --test:*)"'
 
