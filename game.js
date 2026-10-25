@@ -268,6 +268,8 @@ function loop(ts) {
       lockPiece();
     }
   }
+  // endGame() no puede cancelar el frame en curso: hay que cortar aquí para no re-programar el bucle
+  if (gameOver) return;
   draw();
   animId = requestAnimationFrame(loop);
 }
