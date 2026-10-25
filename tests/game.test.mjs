@@ -67,7 +67,8 @@ test('randomPiece() cubre exactamente los tipos de PIECES', () => {
 test('los canvas de index.html encajan con COLS, ROWS y BLOCK', () => {
   const run = loadGame();
   assert.deepEqual(canvasSize('board'), [run('COLS * BLOCK'), run('ROWS * BLOCK')]);
-  assert.deepEqual(canvasSize('next-canvas'), [120, 120]); // drawNext() usa una rejilla 4×4 de 30 px
+  assert.deepEqual(canvasSize('next-canvas'), [120, 120]); // drawPreview() usa una rejilla 4×4 de 30 px
+  assert.deepEqual(canvasSize('hold-canvas'), [120, 120]);
 });
 
 test('collide() detecta paredes, suelo y bloques', () => {
@@ -126,4 +127,47 @@ test('loop() no se re-programa tras un game over por gravedad', () => {
   run('dropAccum = dropInterval; loop(lastTime)');
   assert.equal(run('gameOver'), true);
   assert.equal(run('rafCalls'), 0, 'el bucle debe detenerse');
+});
+
+test('holdPiece() guarda la pieza, toma next y solo se usa una vez por pieza', () => {
+  const run = loadGame();
+  run('board = createBoard(); held = null; holdUsed = false;');
+  run('current = makePiece(1); current.shape = rotateCW(current.shape); current.x = 0; current.y = 7');
+  run('next = makePiece(2)');
+  run('holdPiece()');
+  assert.equal(run('held'), 1);
+  assert.equal(run('current.type'), 2, 'con el hold vacío entra next');
+  assert.equal(run('holdUsed'), true);
+
+  run('holdPiece()');
+  assert.equal(run('held'), 1, 'un segundo hold antes de fijar se ignora');
+  assert.equal(run('current.type'), 2);
+});
+
+test('holdPiece() intercambia con la pieza reservada en su rotación base y posición de spawn', () => {
+  const run = loadGame();
+  run('board = createBoard(); held = 1; holdUsed = false;');
+  run('current = makePiece(3); current.shape = rotateCW(current.shape); current.x = 0; current.y = 9');
+  run('holdPiece()');
+  assert.equal(run('held'), 3);
+  assert.deepEqual(run('current'), run('makePiece(1)'));
+});
+
+test('el hold se desbloquea al fijar la pieza y init() lo vacía', () => {
+  const run = loadGame();
+  run('board = createBoard(); held = 5; holdUsed = true;');
+  run('current = makePiece(2); hardDrop()');
+  assert.equal(run('holdUsed'), false);
+
+  run('init()');
+  assert.equal(run('held'), null);
+  assert.equal(run('holdUsed'), false);
+});
+
+test('holdPiece() acaba la partida si la pieza intercambiada nace colisionando', () => {
+  const run = loadGame();
+  run('board = createBoard(); board[0].fill(3, 1); board[1].fill(3, 1); held = 2; holdUsed = false;');
+  run('current = makePiece(1); current.y = 10');
+  run('holdPiece()');
+  assert.equal(run('gameOver'), true);
 });

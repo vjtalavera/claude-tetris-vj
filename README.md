@@ -91,13 +91,14 @@ node --test
 
 ## Controles
 
-| Tecla     | Acción                            |
-| --------- | --------------------------------- |
-| `←` / `→` | Mover la pieza horizontalmente    |
-| `↑` o `X` | Rotar la pieza en sentido horario |
-| `↓`       | Soft drop (bajar más rápido)      |
-| `Espacio` | Hard drop (caída instantánea)     |
-| `P`       | Pausar / reanudar                 |
+| Tecla         | Acción                                                      |
+| ------------- | ----------------------------------------------------------- |
+| `←` / `→`     | Mover la pieza horizontalmente                              |
+| `↑` o `X`     | Rotar la pieza en sentido horario                           |
+| `↓`           | Soft drop (bajar más rápido)                                |
+| `Espacio`     | Hard drop (caída instantánea)                               |
+| `C` o `Shift` | Hold: reservar o intercambiar la pieza (una vez por pieza)  |
+| `P`           | Pausar / reanudar                                           |
 
 ---
 
@@ -118,7 +119,8 @@ El juego se compone de tres archivos que cooperan:
 Define la estructura visual:
 
 - Un `<canvas id="board">` de **300 × 600** píxeles donde se renderiza el tablero.
-- Un panel lateral con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
+- Un panel izquierdo con el slot `HOLD` (pieza reservada).
+- Un panel derecho con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
 - Un overlay para los estados **PAUSA** y **GAME OVER**.
 
 ### 2. `style.css`
@@ -138,6 +140,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
 - **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
+- **Hold** (`holdPiece`): guarda la pieza actual (sin rotación) o la intercambia con la reservada. Solo se puede usar una vez por pieza; el slot se atenúa hasta que la pieza se fija.
 
 ### Flujo del juego
 
@@ -154,7 +157,7 @@ init()
      ├─ draw()  (grid + tablero + ghost + pieza actual)
      └─ requestAnimationFrame(loop)
 
-   keydown → mover / rotar / soft-drop / hard-drop / pausa
+   keydown → mover / rotar / soft-drop / hard-drop / hold / pausa
 ```
 
 Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra el overlay de **Game Over**.
@@ -163,7 +166,7 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 
 ## Tecnologías
 
-- **HTML5** — marcado y dos elementos `<canvas>` (tablero y vista previa).
+- **HTML5** — marcado y tres elementos `<canvas>` (tablero, hold y vista previa).
 - **CSS3** — _flexbox_, variables de color, `backdrop-filter` y `box-shadow`.
 - **JavaScript (ES6+) vanilla** — `const`/`let`, _arrow functions_, _spread operator_, `Array.from`, _template literals_…
 - **Canvas 2D API** — para todo el renderizado del juego.

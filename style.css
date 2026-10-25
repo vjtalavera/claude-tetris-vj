@@ -114,6 +114,11 @@ body {
   gap: 6px;
 }
 
+/* Panel izquierdo (HOLD): pegado al tablero, mismo ancho que el derecho para que el tablero quede centrado */
+.panel-left .panel-section {
+  align-items: flex-end;
+}
+
 .label {
   font-size: 10px;
   letter-spacing: 2px;
@@ -129,7 +134,8 @@ body {
   letter-spacing: 1px;
 }
 
-#next-canvas {
+#next-canvas,
+#hold-canvas {
   display: block;
   border: 1px solid var(--border);
   background: var(--panel-bg);
