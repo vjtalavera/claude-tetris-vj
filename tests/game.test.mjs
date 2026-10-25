@@ -26,6 +26,7 @@ function loadGame() {
     requestAnimationFrame: () => 0, // el bucle no avanza solo: los tests mueven el estado a mano
     cancelAnimationFrame() {},
     performance,
+    getComputedStyle: () => ({ getPropertyValue: () => '' }),
     localStorage: { getItem: () => null, setItem() {} },
   });
   vm.runInContext(gameSrc, context);
@@ -113,4 +114,16 @@ test('hardDrop() fija la pieza en el fondo y suma 2 puntos por fila', () => {
   assert.equal(run('score'), (run('ROWS') - 2) * 2);
   assert.deepEqual(run('board[ROWS - 1].slice(4, 6)'), [2, 2]);
   assert.deepEqual(run('board[ROWS - 2].slice(4, 6)'), [2, 2]);
+});
+
+test('loop() no se re-programa tras un game over por gravedad', () => {
+  const run = loadGame();
+  run('var rafCalls = 0; requestAnimationFrame = () => ++rafCalls');
+  // Filas superiores llenas salvo la columna 0 (no se limpian): la siguiente pieza nace colisionando.
+  run('board = createBoard(); board[0].fill(3, 1); board[1].fill(3, 1);');
+  run('current = { type: 2, shape: PIECES[2].map(r => [...r]), x: 4, y: ROWS - 2 }');
+  run('next = { type: 2, shape: PIECES[2].map(r => [...r]), x: 4, y: 0 }');
+  run('dropAccum = dropInterval; loop(lastTime)');
+  assert.equal(run('gameOver'), true);
+  assert.equal(run('rafCalls'), 0, 'el bucle debe detenerse');
 });
