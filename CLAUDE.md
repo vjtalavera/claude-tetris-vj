@@ -30,11 +30,12 @@ Tetris en JavaScript vanilla + HTML5 Canvas. Sin dependencias, sin `package.json
 - El número de cada celda es a la vez el tipo de pieza y el índice en `COLORS`: `PIECES[t]` usa el valor `t` en sus celdas, `merge()` copia esos valores al `board` y `drawBlock()` los resuelve contra `COLORS`. Añadir una pieza implica tocar `PIECES`, `COLORS`, `COLORS_LIGHT` (paleta del modo claro, mismos índices) y el `* 7` de `randomPiece()`.
 - `collide(shape, x, y)` es la única comprobación de colisión; la usan movimiento, rotación (`tryRotate` con kicks `[0,-1,1,-2,2]`), caída, ghost (`ghostY`) y detección de game over en `spawn()`.
 - Bucle: `requestAnimationFrame(loop)` acumula `dt` en `dropAccum` y baja una fila al superar `dropInterval`. Pausa y game over cancelan el frame con `cancelAnimationFrame(animId)`; reanudar llama a `loop()` directamente.
-- Ciclo de fijado: `lockPiece()` → `merge()` → `clearLines()` (recalcula `level` y `dropInterval = max(100, 1000 - (level-1)*90)`) → `spawn()` (mueve `next` a `current`, genera `next`, redibuja la vista previa).
+- Ciclo de fijado: `lockPiece()` → `merge()` → `clearLines()` (recalcula `level` y `dropInterval = max(100, 1000 - (level-1)*90)`) → `holdUsed = false` → `spawn()` (mueve `next` a `current`, genera `next`, redibuja la vista previa) → `drawHold()`.
+- Hold: `held` guarda solo el tipo (la pieza vuelve sin rotar vía `makePiece(type)`) y `holdUsed` lo bloquea hasta el siguiente fijado. `holdPiece()` también llama a `spawn()` en el primer hold, por eso el desbloqueo vive en `lockPiece()` y no en `spawn()`.
 - El overlay (`#overlay`) se reutiliza para PAUSA y GAME OVER cambiando `#overlay-title`/`#overlay-score` y la clase `hidden`.
 
 ## Acoplamientos a tener en cuenta
 
 - Tamaño del canvas `#board` en `index.html` debe ser `COLS*BLOCK × ROWS*BLOCK` (300×600 por defecto).
-- `drawNext()` asume una rejilla 4×4 de 30 px → `#next-canvas` es 120×120.
+- `drawPreview()` (usado por `drawNext()` y `drawHold()`) asume una rejilla 4×4 de 30 px → `#next-canvas` y `#hold-canvas` son 120×120.
 - Los controles están documentados en tres sitios: el `keydown` de `game.js`, la lista `.controls` de `index.html` y la tabla del README. Mantenlos sincronizados.
