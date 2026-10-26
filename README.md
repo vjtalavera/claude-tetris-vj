@@ -44,9 +44,10 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Pieza fantasma** (_ghost piece_): muestra dónde aterrizará la pieza actual.
 - **Vista previa** de la siguiente pieza.
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
-- **Niveles** que aumentan cada 10 líneas y aceleran la caída.
+- **Niveles** que aumentan cada 10 líneas y aceleran la caída, con **nivel inicial** configurable (1–10) desde el menú de pausa.
 - **Modo oscuro / claro**: el juego arranca en oscuro y el botón de la esquina superior derecha («Modo claro» / «Modo oscuro») cambia el tema. La elección se guarda en `localStorage`.
-- **Pausa** y **Game Over** con opción de reinicio.
+- **Menú de pausa** (`P` o `Escape`) con **Reanudar**, **Reiniciar**, **Ver controles** y selector de **Nivel inicial**. Mientras está abierto el juego ignora el teclado, y al reanudar no cuentan las teclas que siguieran pulsadas desde antes.
+- **Game Over** con opción de reinicio.
 
 ---
 
@@ -98,7 +99,7 @@ node --test
 | `↓`           | Soft drop (bajar más rápido)                                |
 | `Espacio`     | Hard drop (caída instantánea)                               |
 | `C` o `Shift` | Hold: reservar o intercambiar la pieza (una vez por pieza)  |
-| `P`           | Pausar / reanudar                                           |
+| `P` o `Esc`   | Abrir / cerrar el menú de pausa                             |
 
 ---
 
@@ -106,7 +107,8 @@ node --test
 
 - **Completa líneas para sumar puntos.** Cuando una fila queda llena de bloques, se elimina y ganas puntos (100 / 300 / 500 / 800 según elimines 1, 2, 3 o 4 líneas a la vez, multiplicado por el nivel). Cada 10 líneas subes de nivel y la caída se acelera.
 - **Cuándo termina la partida.** El juego acaba (**Game Over**) cuando una pieza nueva no cabe al aparecer en la parte superior del tablero porque los bloques apilados llegan hasta arriba. Se muestra tu puntuación final.
-- **Reiniciar.** El botón **Reiniciar** está dentro del overlay, así que solo se ve al pausar con `P` o cuando aparece el Game Over. Púlsalo para empezar una partida nueva.
+- **Menú de pausa.** Con `P` o `Escape` se abre el menú: **Reanudar** vuelve a la partida, **Reiniciar** empieza una nueva sin recargar la página, **Ver controles** despliega la lista de teclas y **Nivel inicial** elige con qué nivel empieza la próxima partida (se guarda en `localStorage`; no altera la partida en curso).
+- **Reiniciar tras el Game Over.** El overlay de Game Over muestra la puntuación final y el botón **Reiniciar**.
 
 ---
 
@@ -121,7 +123,7 @@ Define la estructura visual:
 - Un `<canvas id="board">` de **300 × 600** píxeles donde se renderiza el tablero.
 - Un panel izquierdo con el slot `HOLD` (pieza reservada).
 - Un panel derecho con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
-- Un overlay para los estados **PAUSA** y **GAME OVER**.
+- Un overlay para los estados **PAUSA** (con el menú de pausa) y **GAME OVER**.
 
 ### 2. `style.css`
 
@@ -138,7 +140,8 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Game loop** (`loop`): basado en `requestAnimationFrame`, acumula el tiempo transcurrido y baja la pieza una fila cuando se supera `dropInterval`.
 - **Limpieza de líneas** (`clearLines`): recorre el tablero de abajo hacia arriba; cada fila completa se elimina y se inserta una vacía en la cima.
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
-- **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
+- **Nivel y velocidad**: la partida empieza en `startLevel` (1 por defecto, elegible en el menú de pausa) y sube un nivel cada 10 líneas (`level = nivel inicial + floor(lines / 10)`); la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
+- **Menú de pausa** (`togglePause`): cancela el bucle y muestra el overlay con el menú; mientras está abierto el `keydown` solo atiende `P`/`Escape`. Al reanudar o reiniciar se ignoran las repeticiones de teclas que seguían pulsadas y se quita el foco del botón pulsado.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
 - **Hold** (`holdPiece`): guarda la pieza actual (sin rotación) o la intercambia con la reservada. Solo se puede usar una vez por pieza; el slot se atenúa hasta que la pieza se fija.
 
@@ -157,7 +160,7 @@ init()
      ├─ draw()  (grid + tablero + ghost + pieza actual)
      └─ requestAnimationFrame(loop)
 
-   keydown → mover / rotar / soft-drop / hard-drop / hold / pausa
+   keydown → mover / rotar / soft-drop / hard-drop / hold / pausa (P o Escape)
 ```
 
 Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra el overlay de **Game Over**.

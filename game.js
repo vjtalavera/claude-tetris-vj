@@ -53,10 +53,26 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const pauseMenu = document.getElementById('pause-menu');
+const resumeBtn = document.getElementById('resume-btn');
+const menuRestartBtn = document.getElementById('menu-restart-btn');
+const controlsBtn = document.getElementById('controls-btn');
+const pauseControls = document.getElementById('pause-controls');
+const controlsList = document.getElementById('controls-list');
+const startLevelSelect = document.getElementById('start-level');
 const themeToggle = document.getElementById('theme-toggle');
 
 const THEME_KEY = 'tetris-theme';
 let theme = 'dark';
+
+const START_LEVEL_KEY = 'tetris-start-level';
+const MAX_START_LEVEL = 10; // debe coincidir con las opciones de #start-level
+let startLevel = 1;     // nivel con el que empieza la próxima partida (lo cambia el menú)
+let gameStartLevel = 1; // nivel con el que empezó la partida en curso
+
+// Teclas pulsadas desde que se cerró el overlay: las repeticiones de cualquier otra
+// (mantenida desde antes de reanudar o reiniciar) se ignoran
+const freshKeys = new Set();
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let held, holdUsed; // tipo de pieza reservada (o null) y si ya se usó el hold con la pieza actual
@@ -128,10 +144,14 @@ function clearLines() {
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    level = gameStartLevel + Math.floor(lines / 10);
+    dropInterval = dropIntervalFor(level);
     updateHUD();
   }
+}
+
+function dropIntervalFor(lvl) {
+  return Math.max(100, 1000 - (lvl - 1) * 90);
 }
 
 function ghostY() {
@@ -268,25 +288,38 @@ function drawHold() {
   drawPreview(holdCtx, holdCanvas, held && PIECES[held], holdUsed ? 0.3 : 1);
 }
 
+// El overlay sirve para PAUSA (con menú) y GAME OVER (solo puntuación y Reiniciar)
+function showOverlay(title, text, isPause) {
+  overlayTitle.textContent = title;
+  overlayScore.textContent = text;
+  pauseMenu.hidden = !isPause;
+  restartBtn.hidden = isPause;
+  overlay.classList.remove('hidden');
+}
+
+function hideOverlay() {
+  overlay.classList.add('hidden');
+  freshKeys.clear();
+  // Quita el foco del botón/selector del menú para que Space, Enter o las flechas no lo reactiven
+  if (document.activeElement) document.activeElement.blur();
+}
+
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
-  overlayTitle.textContent = 'GAME OVER';
-  overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
-  overlay.classList.remove('hidden');
+  showOverlay('GAME OVER', `Puntuación: ${score.toLocaleString()}`, false);
 }
 
 function togglePause() {
   if (gameOver) return;
   paused = !paused;
   if (!paused) {
+    hideOverlay();
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlay.classList.remove('hidden');
+    showOverlay('PAUSA', '', true);
   }
 }
 
@@ -312,10 +345,11 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  gameStartLevel = startLevel;
+  level = gameStartLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = dropIntervalFor(level);
   dropAccum = 0;
   lastTime = performance.now();
   held = null;
@@ -324,14 +358,20 @@ function init() {
   spawn();
   drawHold();
   updateHUD();
-  overlay.classList.add('hidden');
+  hideOverlay();
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  if (!e.repeat) freshKeys.add(e.code);
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (!e.repeat) togglePause();
+    return;
+  }
+  // Con el menú abierto el juego ignora el teclado (Space/Enter siguen accionando el botón con foco)
   if (paused || gameOver) return;
+  if (e.repeat && !freshKeys.has(e.code)) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -360,6 +400,29 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+menuRestartBtn.addEventListener('click', init);
+resumeBtn.addEventListener('click', togglePause);
+
+pauseControls.innerHTML = controlsList.innerHTML; // misma lista que el panel lateral
+controlsBtn.addEventListener('click', () => {
+  pauseControls.hidden = !pauseControls.hidden;
+  controlsBtn.textContent = pauseControls.hidden ? 'Ver controles' : 'Ocultar controles';
+  controlsBtn.setAttribute('aria-expanded', String(!pauseControls.hidden));
+});
+
+function parseStartLevel(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 && n <= MAX_START_LEVEL ? n : 1;
+}
+
+// Solo afecta a la próxima partida: init() lo aplica al reiniciar
+startLevelSelect.addEventListener('change', () => {
+  startLevel = parseStartLevel(startLevelSelect.value);
+  try { localStorage.setItem(START_LEVEL_KEY, String(startLevel)); } catch (e) { /* almacenamiento no disponible */ }
+});
+
+try { startLevel = parseStartLevel(localStorage.getItem(START_LEVEL_KEY)); } catch (e) { /* ignorar */ }
+startLevelSelect.value = String(startLevel);
 
 function setTheme(t, persist) {
   theme = t === 'light' ? 'light' : 'dark';

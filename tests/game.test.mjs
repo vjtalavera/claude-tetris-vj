@@ -11,23 +11,32 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 function element() {
   // getContext devuelve un contexto 2D en el que cualquier método es un no-op.
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => {}) });
+  const listeners = {};
   return {
-    textContent: '', width: 0, height: 0,
+    textContent: '', width: 0, height: 0, listeners, // listeners.<tipo>() dispara el handler registrado
     classList: { add() {}, remove() {}, toggle() {} },
-    addEventListener() {}, setAttribute() {}, blur() {},
+    addEventListener: (type, fn) => { listeners[type] = fn; }, setAttribute() {}, blur() {},
     getContext: () => ctx2d,
   };
 }
 
 // Devuelve run(code): evalúa código en un juego recién inicializado (init() ya ejecutado).
-function loadGame() {
+// `storage` precarga localStorage. En el contexto, keydown(code, repeat) dispara el handler
+// que game.js registra en document.
+function loadGame(storage = {}) {
+  const listeners = {};
   const context = vm.createContext({
-    document: { getElementById: element, addEventListener() {}, documentElement: { dataset: {} } },
+    document: {
+      getElementById: element,
+      addEventListener: (type, fn) => { listeners[type] = fn; },
+      documentElement: { dataset: {} },
+    },
     requestAnimationFrame: () => 0, // el bucle no avanza solo: los tests mueven el estado a mano
     cancelAnimationFrame() {},
     performance,
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
-    localStorage: { getItem: () => null, setItem() {} },
+    localStorage: { getItem: k => storage[k] ?? null, setItem: (k, v) => { storage[k] = String(v); } },
+    keydown: (code, repeat = false) => listeners.keydown({ code, repeat, preventDefault() {} }),
   });
   vm.runInContext(gameSrc, context);
   return code => {
@@ -170,4 +179,101 @@ test('holdPiece() acaba la partida si la pieza intercambiada nace colisionando',
   run('current = makePiece(1); current.y = 10');
   run('holdPiece()');
   assert.equal(run('gameOver'), true);
+});
+
+test('P y Escape abren y cierran el menú de pausa; Escape no hace nada en game over', () => {
+  const run = loadGame();
+  run("keydown('Escape')");
+  assert.equal(run('paused'), true);
+  assert.equal(run('pauseMenu.hidden'), false, 'el menú se muestra en pausa');
+  assert.equal(run('restartBtn.hidden'), true, 'el Reiniciar de game over se oculta');
+  run("keydown('Escape', true)");
+  assert.equal(run('paused'), true, 'mantener Escape no alterna la pausa');
+  run("keydown('Escape')");
+  assert.equal(run('paused'), false);
+  run("keydown('KeyP')");
+  assert.equal(run('paused'), true);
+  run("keydown('KeyP')");
+  assert.equal(run('paused'), false);
+
+  run('endGame()');
+  assert.equal(run('pauseMenu.hidden'), true, 'game over sin menú de pausa');
+  assert.equal(run('restartBtn.hidden'), false);
+  run("keydown('Escape')");
+  assert.equal(run('paused'), false);
+});
+
+test('con el menú abierto se ignoran las teclas del juego', () => {
+  const run = loadGame();
+  run('board = createBoard(); held = null; holdUsed = false; current = makePiece(2); next = makePiece(3);');
+  const before = run('current');
+  run("keydown('Escape')");
+  for (const code of ['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'KeyX', 'Space', 'KeyC', 'ShiftLeft']) {
+    run(`keydown('${code}')`);
+  }
+  assert.deepEqual(run('current'), before);
+  assert.equal(run('held'), null);
+  assert.ok(run('board.every(row => row.every(v => v === 0))'));
+});
+
+test('al reanudar se ignoran las repeticiones de teclas mantenidas desde antes', () => {
+  const run = loadGame();
+  run('board = createBoard(); current = makePiece(2);');
+  const x = run('current.x');
+  run("keydown('KeyP'); keydown('ArrowLeft'); keydown('KeyP')"); // ArrowLeft sigue pulsada al reanudar
+  run("keydown('ArrowLeft', true)");
+  assert.equal(run('current.x'), x, 'la repetición de una tecla previa no mueve');
+  run("keydown('ArrowLeft')");
+  assert.equal(run('current.x'), x - 1, 'una pulsación nueva sí mueve');
+  run("keydown('ArrowLeft', true)");
+  assert.equal(run('current.x'), x - 2, 'y sus repeticiones también');
+});
+
+test('al reiniciar desde el menú también se ignoran las repeticiones previas', () => {
+  const run = loadGame();
+  run("keydown('Escape'); keydown('ArrowLeft'); init()"); // Reiniciar con ArrowLeft pulsada
+  const x = run('current.x');
+  run("keydown('ArrowLeft', true)");
+  assert.equal(run('current.x'), x);
+});
+
+test('init() aplica startLevel a level y dropInterval', () => {
+  const run = loadGame();
+  run('startLevel = 5; init()');
+  assert.equal(run('level'), 5);
+  assert.equal(run('dropInterval'), 640);
+});
+
+test('clearLines() progresa desde startLevel', () => {
+  const run = loadGame();
+  run('startLevel = 3; init(); board = createBoard(); lines = 9; score = 0;');
+  run('board[ROWS - 1].fill(1); clearLines()');
+  assert.equal(run('score'), 300); // 100 × nivel 3
+  assert.equal(run('level'), 4);
+  assert.equal(run('dropInterval'), 730);
+});
+
+test('startLevel se lee de localStorage, se valida y se guarda al cambiar el selector', () => {
+  assert.equal(loadGame({ 'tetris-start-level': '7' })('level'), 7);
+  for (const bad of ['0', '11', '2.5', 'abc']) {
+    assert.equal(loadGame({ 'tetris-start-level': bad })('startLevel'), 1, `valor inválido ${bad}`);
+  }
+
+  const storage = {};
+  const run = loadGame(storage);
+  run("startLevelSelect.value = '4'; startLevelSelect.listeners.change()");
+  assert.equal(run('startLevel'), 4);
+  assert.equal(storage['tetris-start-level'], '4');
+  assert.equal(run('level'), 1, 'la partida en curso no cambia');
+  run('board = createBoard(); lines = 0; board[ROWS - 1].fill(1); clearLines()');
+  assert.equal(run('level'), 1, 'ni al limpiar líneas');
+  run('init()');
+  assert.equal(run('level'), 4, 'se aplica en la siguiente partida');
+});
+
+test('las opciones de #start-level van de 1 a MAX_START_LEVEL', () => {
+  const run = loadGame();
+  const select = html.match(/<select[^>]*id="start-level"[^>]*>([\s\S]*?)<\/select>/)[1];
+  const values = [...select.matchAll(/value="(\d+)"/g)].map(m => Number(m[1]));
+  assert.deepEqual(values, Array.from({ length: run('MAX_START_LEVEL') }, (_, i) => i + 1));
 });
