@@ -306,3 +306,115 @@ kbd {
   color: var(--muted);
   text-align: left;
 }
+
+/* ---- Récords ---- */
+#record-new {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+
+#record-form {
+  display: flex;
+  gap: 6px;
+}
+
+#record-name {
+  width: 150px;
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  user-select: text;
+}
+
+#record-name:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#record-form button,
+#reset-records-btn {
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#record-form button:hover {
+  border-color: var(--accent);
+}
+
+#reset-records-btn {
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+#reset-records-btn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+#records {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+#records table {
+  border-collapse: collapse;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  min-width: 260px;
+}
+
+#records th {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--label);
+  font-weight: 600;
+  padding: 0 8px 4px;
+}
+
+#records td {
+  padding: 3px 8px;
+  border-top: 1px solid var(--border);
+}
+
+#records :is(th, td):nth-child(2) {
+  text-align: left;
+}
+
+#records :is(th, td):nth-child(3),
+#records :is(th, td):nth-child(4) {
+  text-align: right;
+}
+
+#records td.empty {
+  text-align: center;
+  color: var(--muted);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+}
+
+#records tr.highlight td {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+#records-stats {
+  font-size: 12px;
+  color: var(--muted);
+}

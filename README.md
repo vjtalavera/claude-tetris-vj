@@ -48,6 +48,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Modo oscuro / claro**: el juego arranca en oscuro y el botón de la esquina superior derecha («Modo claro» / «Modo oscuro») cambia el tema. La elección se guarda en `localStorage`.
 - **Menú de pausa** (`P` o `Escape`) con **Reanudar**, **Reiniciar**, **Ver controles** y selector de **Nivel inicial**. Mientras está abierto el juego ignora el teclado, y al reanudar no cuentan las teclas que siguieran pulsadas desde antes.
 - **Game Over** con opción de reinicio.
+- **Tabla de récords local**: top 5 de puntuaciones con nombre, mejor combo y líneas máximas, guardados en `localStorage` y visibles en la pantalla de inicio y en el Game Over.
 
 ---
 
@@ -106,9 +107,12 @@ node --test
 ## Cómo se juega
 
 - **Completa líneas para sumar puntos.** Cuando una fila queda llena de bloques, se elimina y ganas puntos (100 / 300 / 500 / 800 según elimines 1, 2, 3 o 4 líneas a la vez, multiplicado por el nivel). Cada 10 líneas subes de nivel y la caída se acelera.
-- **Cuándo termina la partida.** El juego acaba (**Game Over**) cuando una pieza nueva no cabe al aparecer en la parte superior del tablero porque los bloques apilados llegan hasta arriba. Se muestra tu puntuación final.
+- **Empezar.** Al abrir el juego aparece la pantalla de inicio con la tabla de récords; pulsa **Jugar** para comenzar.
+- **Combos.** El combo cuenta cuántas piezas seguidas has fijado limpiando al menos una línea cada una: cada una suma 1 y una pieza que no limpia lo devuelve a 0. El mejor combo se guarda como récord.
+- **Cuándo termina la partida.** El juego acaba (**Game Over**) cuando una pieza nueva no cabe al aparecer en la parte superior del tablero porque los bloques apilados llegan hasta arriba. Se muestra tu puntuación final y la tabla de récords.
 - **Menú de pausa.** Con `P` o `Escape` se abre el menú: **Reanudar** vuelve a la partida, **Reiniciar** empieza una nueva sin recargar la página, **Ver controles** despliega la lista de teclas y **Nivel inicial** elige con qué nivel empieza la próxima partida (se guarda en `localStorage`; no altera la partida en curso).
-- **Reiniciar tras el Game Over.** El overlay de Game Over muestra la puntuación final y el botón **Reiniciar**.
+- **Récords.** Si tu puntuación entra en el top 5 verás «¡Nuevo récord!» y un campo para escribir tu nombre (máx. 12 caracteres); pulsa **Guardar** o `Enter` y tu fila quedará resaltada. El mejor combo y las líneas máximas se guardan siempre. El botón **Borrar récords** (con confirmación) vacía la tabla.
+- **Reiniciar tras el Game Over.** El overlay de Game Over muestra la puntuación final, los récords y el botón **Reiniciar** (el mismo que en la pantalla de inicio se llama **Jugar**).
 
 ---
 
@@ -123,7 +127,7 @@ Define la estructura visual:
 - Un `<canvas id="board">` de **300 × 600** píxeles donde se renderiza el tablero.
 - Un panel izquierdo con el slot `HOLD` (pieza reservada).
 - Un panel derecho con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
-- Un overlay para los estados **PAUSA** (con el menú de pausa) y **GAME OVER**.
+- Un overlay para la **pantalla de inicio** y los estados **PAUSA** (con el menú de pausa) y **GAME OVER** (con la tabla de récords y el formulario de nombre).
 
 ### 2. `style.css`
 
@@ -144,6 +148,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Menú de pausa** (`togglePause`): cancela el bucle y muestra el overlay con el menú; mientras está abierto el `keydown` solo atiende `P`/`Escape`. Al reanudar o reiniciar se ignoran las repeticiones de teclas que seguían pulsadas y se quita el foco del botón pulsado.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
 - **Hold** (`holdPiece`): guarda la pieza actual (sin rotación) o la intercambia con la reservada. Solo se puede usar una vez por pieza; el slot se atenúa hasta que la pieza se fija.
+- **Récords** (`loadRecords`, `addRecord`, `qualifies`): se guardan en `localStorage` bajo la clave `tetris-records` como `{ top: [{ name, score, lines }], bestCombo, maxLines }`. Si el JSON está corrupto o el almacenamiento no está disponible, se empieza con la tabla vacía.
 
 ### Flujo del juego
 
@@ -163,7 +168,9 @@ init()
    keydown → mover / rotar / soft-drop / hard-drop / hold / pausa (P o Escape)
 ```
 
-Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra el overlay de **Game Over**.
+Al cargar, tras `init()` se llama a `showStart()`, que detiene el bucle y muestra la pantalla de inicio hasta pulsar **Jugar**.
+
+Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()`: guarda el mejor combo y las líneas máximas, y muestra el overlay de **Game Over** con los récords (y el campo de nombre si la puntuación entra en el top 5).
 
 ---
 
