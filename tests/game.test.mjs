@@ -13,30 +13,44 @@ function element() {
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => {}) });
   const listeners = {};
   return {
-    textContent: '', width: 0, height: 0, listeners, // listeners.<tipo>() dispara el handler registrado
+    textContent: '', value: '', hidden: false, width: 0, height: 0, listeners, // listeners.<tipo>() dispara el handler registrado
     classList: { add() {}, remove() {}, toggle() {} },
-    addEventListener: (type, fn) => { listeners[type] = fn; }, setAttribute() {}, blur() {},
+    addEventListener: (type, fn) => { listeners[type] = fn; },
+    setAttribute() {}, appendChild() {}, blur() {}, focus() {}, select() {},
     getContext: () => ctx2d,
   };
 }
 
+// localStorage en memoria (los valores se guardan como string, igual que en el navegador).
+function memoryStorage(initial = {}) {
+  const data = { ...initial };
+  return {
+    data,
+    getItem: k => (k in data ? data[k] : null),
+    setItem: (k, v) => { data[k] = String(v); },
+    removeItem: k => { delete data[k]; },
+  };
+}
+
 // Devuelve run(code): evalúa código en un juego recién inicializado (init() ya ejecutado).
-// `storage` precarga localStorage. En el contexto, keydown(code, repeat) dispara el handler
-// que game.js registra en document.
-function loadGame(storage = {}) {
-  const listeners = {};
+// Los listeners de document quedan en `documentListeners` para poder disparar eventos;
+// keydown(code, repeat) simula una pulsación fuera de cualquier campo de texto.
+function loadGame({ storage = memoryStorage() } = {}) {
+  const documentListeners = {};
   const context = vm.createContext({
     document: {
       getElementById: element,
-      addEventListener: (type, fn) => { listeners[type] = fn; },
+      createElement: element,
+      addEventListener: (type, fn) => { documentListeners[type] = fn; },
       documentElement: { dataset: {} },
     },
+    documentListeners,
     requestAnimationFrame: () => 0, // el bucle no avanza solo: los tests mueven el estado a mano
     cancelAnimationFrame() {},
     performance,
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
-    localStorage: { getItem: k => storage[k] ?? null, setItem: (k, v) => { storage[k] = String(v); } },
-    keydown: (code, repeat = false) => listeners.keydown({ code, repeat, preventDefault() {} }),
+    localStorage: storage,
+    keydown: (code, repeat = false) => documentListeners.keydown({ code, repeat, target: {}, preventDefault() {} }),
   });
   vm.runInContext(gameSrc, context);
   return code => {
@@ -183,6 +197,7 @@ test('holdPiece() acaba la partida si la pieza intercambiada nace colisionando',
 
 test('P y Escape abren y cierran el menú de pausa; Escape no hace nada en game over', () => {
   const run = loadGame();
+  run('init()'); // pulsa Jugar en la pantalla de inicio
   run("keydown('Escape')");
   assert.equal(run('paused'), true);
   assert.equal(run('pauseMenu.hidden'), false, 'el menú se muestra en pausa');
@@ -205,6 +220,7 @@ test('P y Escape abren y cierran el menú de pausa; Escape no hace nada en game 
 
 test('con el menú abierto se ignoran las teclas del juego', () => {
   const run = loadGame();
+  run('init()'); // pulsa Jugar en la pantalla de inicio
   run('board = createBoard(); held = null; holdUsed = false; current = makePiece(2); next = makePiece(3);');
   const before = run('current');
   run("keydown('Escape')");
@@ -218,6 +234,7 @@ test('con el menú abierto se ignoran las teclas del juego', () => {
 
 test('al reanudar se ignoran las repeticiones de teclas mantenidas desde antes', () => {
   const run = loadGame();
+  run('init()'); // pulsa Jugar en la pantalla de inicio
   run('board = createBoard(); current = makePiece(2);');
   const x = run('current.x');
   run("keydown('KeyP'); keydown('ArrowLeft'); keydown('KeyP')"); // ArrowLeft sigue pulsada al reanudar
@@ -231,6 +248,7 @@ test('al reanudar se ignoran las repeticiones de teclas mantenidas desde antes',
 
 test('al reiniciar desde el menú también se ignoran las repeticiones previas', () => {
   const run = loadGame();
+  run('init()'); // pulsa Jugar en la pantalla de inicio
   run("keydown('Escape'); keydown('ArrowLeft'); init()"); // Reiniciar con ArrowLeft pulsada
   const x = run('current.x');
   run("keydown('ArrowLeft', true)");
@@ -254,16 +272,16 @@ test('clearLines() progresa desde startLevel', () => {
 });
 
 test('startLevel se lee de localStorage, se valida y se guarda al cambiar el selector', () => {
-  assert.equal(loadGame({ 'tetris-start-level': '7' })('level'), 7);
+  assert.equal(loadGame({ storage: memoryStorage({ 'tetris-start-level': '7' }) })('level'), 7);
   for (const bad of ['0', '11', '2.5', 'abc']) {
-    assert.equal(loadGame({ 'tetris-start-level': bad })('startLevel'), 1, `valor inválido ${bad}`);
+    assert.equal(loadGame({ storage: memoryStorage({ 'tetris-start-level': bad }) })('startLevel'), 1, `valor inválido ${bad}`);
   }
 
-  const storage = {};
-  const run = loadGame(storage);
+  const storage = memoryStorage();
+  const run = loadGame({ storage });
   run("startLevelSelect.value = '4'; startLevelSelect.listeners.change()");
   assert.equal(run('startLevel'), 4);
-  assert.equal(storage['tetris-start-level'], '4');
+  assert.equal(storage.data['tetris-start-level'], '4');
   assert.equal(run('level'), 1, 'la partida en curso no cambia');
   run('board = createBoard(); lines = 0; board[ROWS - 1].fill(1); clearLines()');
   assert.equal(run('level'), 1, 'ni al limpiar líneas');
@@ -276,4 +294,128 @@ test('las opciones de #start-level van de 1 a MAX_START_LEVEL', () => {
   const select = html.match(/<select[^>]*id="start-level"[^>]*>([\s\S]*?)<\/select>/)[1];
   const values = [...select.matchAll(/value="(\d+)"/g)].map(m => Number(m[1]));
   assert.deepEqual(values, Array.from({ length: run('MAX_START_LEVEL') }, (_, i) => i + 1));
+});
+
+// ---- Récords ----
+
+test('addRecord() inserta en orden descendente y recorta el top a 5', () => {
+  const run = loadGame();
+  run('records = emptyRecords()');
+  for (const s of [300, 100, 500, 200, 400]) run(`addRecord('p${s}', ${s}, 1)`);
+  assert.deepEqual(run('records.top.map(e => e.score)'), [500, 400, 300, 200, 100]);
+  assert.equal(run("addRecord('nuevo', 450, 7)"), 1, 'devuelve la posición insertada');
+  assert.deepEqual(run('records.top.map(e => e.score)'), [500, 450, 400, 300, 200]);
+  assert.deepEqual(run('records.top[1]'), { name: 'nuevo', score: 450, lines: 7 });
+  assert.equal(run("addRecord('bajo', 50, 1)"), -1, 'no entra en un top lleno');
+  assert.equal(run('records.top.length'), 5);
+});
+
+test('qualifies() exige puntuación > 0 y superar a la última del top lleno', () => {
+  const run = loadGame();
+  run('records = emptyRecords()');
+  assert.equal(run('qualifies(0)'), false);
+  assert.equal(run('qualifies(1)'), true, 'con hueco libre entra cualquier puntuación > 0');
+  for (const s of [500, 400, 300, 200, 100]) run(`addRecord('x', ${s}, 0)`);
+  assert.equal(run('qualifies(100)'), false, 'un empate con la última no entra');
+  assert.equal(run('qualifies(101)'), true);
+});
+
+test('combo cuenta fijados seguidos que limpian líneas y se reinicia con uno que no limpia', () => {
+  const run = loadGame();
+  run('board = createBoard(); score = 0; lines = 0; level = 1; combo = 0; maxCombo = 0;');
+  run('board[ROWS - 1].fill(1); clearLines(); board[ROWS - 1].fill(1); clearLines()');
+  assert.equal(run('combo'), 2);
+  run('clearLines()');
+  assert.equal(run('combo'), 0);
+  assert.equal(run('maxCombo'), 2, 'el máximo de la partida se conserva');
+
+  // Ciclo de fijado completo: una O que completa la fila inferior
+  run('board[ROWS - 1].fill(3); board[ROWS - 1][4] = board[ROWS - 1][5] = 0;');
+  run('current = makePiece(2); hardDrop()');
+  assert.equal(run('combo'), 1);
+
+  run('init()');
+  assert.equal(run('combo'), 0);
+  assert.equal(run('maxCombo'), 0);
+});
+
+test('los récords se persisten en localStorage y se recuperan al cargar', () => {
+  const storage = memoryStorage();
+  const run = loadGame({ storage });
+  run("addRecord('Ana', 1200, 12)");
+  assert.deepEqual(JSON.parse(storage.data['tetris-records']).top, [{ name: 'Ana', score: 1200, lines: 12 }]);
+
+  const again = loadGame({ storage });
+  assert.deepEqual(again('records.top'), [{ name: 'Ana', score: 1200, lines: 12 }]);
+});
+
+test('endGame() persiste mejor combo y líneas máximas aunque no se guarde nombre', () => {
+  const storage = memoryStorage({ 'tetris-records': JSON.stringify({ top: [], bestCombo: 5, maxLines: 3 }) });
+  const run = loadGame({ storage });
+  run('score = 0; lines = 40; maxCombo = 2; endGame()');
+  assert.deepEqual(JSON.parse(storage.data['tetris-records']), { top: [], bestCombo: 5, maxLines: 40 });
+  assert.equal(run('recordForm.hidden'), true, 'con 0 puntos no se pide nombre');
+});
+
+test('al acabar con puntuación de top se pide nombre y Guardar lo inserta resaltado', () => {
+  const run = loadGame();
+  run('score = 900; lines = 9; endGame()');
+  assert.equal(run('recordForm.hidden'), false);
+  assert.equal(run('recordNew.hidden'), false);
+  assert.equal(run('recordName.value'), 'Jugador');
+  run("recordName.value = '  Bea con nombre largo  '; saveRecord()");
+  assert.deepEqual(run('records.top'), [{ name: 'Bea con nomb', score: 900, lines: 9 }], 'nombre recortado a 12');
+  assert.equal(run('highlight'), 0);
+  assert.equal(run('recordForm.hidden'), true);
+  run('saveRecord()');
+  assert.equal(run('records.top.length'), 1, 'no se guarda dos veces');
+});
+
+test('JSON corrupto o con forma inválida en localStorage da un registro vacío', () => {
+  const empty = { top: [], bestCombo: 0, maxLines: 0 };
+  for (const raw of ['{no es json', '"texto"', '{"top":"x","bestCombo":0,"maxLines":0}',
+    '{"top":[{"name":1,"score":2,"lines":3}],"bestCombo":0,"maxLines":0}', '{"top":[]}']) {
+    const run = loadGame({ storage: memoryStorage({ 'tetris-records': raw }) });
+    assert.deepEqual(run('records'), empty, raw);
+  }
+  const broken = { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('bloqueado'); } };
+  const run = loadGame({ storage: broken });
+  assert.deepEqual(run('records'), empty);
+  run("addRecord('x', 10, 1)"); // no debe lanzar
+});
+
+test('una entrada inválida se descarta sin perder las válidas', () => {
+  const raw = JSON.stringify({
+    top: [{ name: 'Ana', score: 100, lines: 1 }, { name: 'Mal', score: 900, lines: null }, { name: 'Bea', score: 300, lines: 3 }],
+    bestCombo: 'x', maxLines: 20,
+  });
+  const run = loadGame({ storage: memoryStorage({ 'tetris-records': raw }) });
+  assert.deepEqual(run('records'), {
+    top: [{ name: 'Bea', score: 300, lines: 3 }, { name: 'Ana', score: 100, lines: 1 }],
+    bestCombo: 0, maxLines: 20,
+  });
+});
+
+test('resetRecords() vacía el registro y el almacenamiento', () => {
+  const storage = memoryStorage();
+  const run = loadGame({ storage });
+  run("addRecord('Ana', 100, 1); records.bestCombo = 4; saveRecords(); highlight = 0; resetRecords()");
+  assert.deepEqual(run('records'), { top: [], bestCombo: 0, maxLines: 0 });
+  assert.equal(run('highlight'), -1);
+  assert.equal('tetris-records' in storage.data, false);
+});
+
+test('pantalla de inicio: el juego espera a Jugar y el teclado se ignora en un INPUT', () => {
+  const run = loadGame();
+  assert.equal(run('started'), false, 'al cargar se muestra la pantalla de inicio');
+  run('board = createBoard(); current = makePiece(2); current.x = 4');
+  run("documentListeners.keydown({ code: 'ArrowLeft', target: {}, preventDefault() {} })");
+  assert.equal(run('current.x'), 4, 'en la pantalla de inicio no se mueve');
+
+  run('init(); current = makePiece(2); current.x = 4');
+  assert.equal(run('started'), true);
+  run("documentListeners.keydown({ code: 'ArrowLeft', target: { tagName: 'INPUT' }, preventDefault() {} })");
+  assert.equal(run('current.x'), 4, 'escribiendo en un INPUT no se mueve');
+  run("documentListeners.keydown({ code: 'ArrowLeft', target: { tagName: 'BODY' }, preventDefault() {} })");
+  assert.equal(run('current.x'), 3);
 });
