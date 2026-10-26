@@ -30,12 +30,14 @@ Tetris en JavaScript vanilla + HTML5 Canvas. Sin dependencias, sin `package.json
 - El número de cada celda es a la vez el tipo de pieza y el índice en `COLORS`: `PIECES[t]` usa el valor `t` en sus celdas, `merge()` copia esos valores al `board` y `drawBlock()` los resuelve contra `COLORS`. Añadir una pieza implica tocar `PIECES`, `COLORS`, `COLORS_LIGHT` (paleta del modo claro, mismos índices) y el `* 7` de `randomPiece()`.
 - `collide(shape, x, y)` es la única comprobación de colisión; la usan movimiento, rotación (`tryRotate` con kicks `[0,-1,1,-2,2]`), caída, ghost (`ghostY`) y detección de game over en `spawn()`.
 - Bucle: `requestAnimationFrame(loop)` acumula `dt` en `dropAccum` y baja una fila al superar `dropInterval`. Pausa y game over cancelan el frame con `cancelAnimationFrame(animId)`; reanudar llama a `loop()` directamente.
-- Ciclo de fijado: `lockPiece()` → `merge()` → `clearLines()` (recalcula `level` y `dropInterval = max(100, 1000 - (level-1)*90)`) → `holdUsed = false` → `spawn()` (mueve `next` a `current`, genera `next`, redibuja la vista previa) → `drawHold()`.
+- Ciclo de fijado: `lockPiece()` → `merge()` → `clearLines()` (recalcula `level = gameStartLevel + floor(lines/10)` y `dropInterval = dropIntervalFor(level)`, es decir `max(100, 1000 - (level-1)*90)`) → `holdUsed = false` → `spawn()` (mueve `next` a `current`, genera `next`, redibuja la vista previa) → `drawHold()`.
+- Nivel inicial: `startLevel` (1–`MAX_START_LEVEL`) se lee de `localStorage` (`tetris-start-level`, inválido → 1) y lo cambia el `<select id="start-level">`; solo `init()` lo copia a `gameStartLevel` (el que usa `clearLines()`), así que no altera la partida en curso. Las opciones del select deben ir de 1 a `MAX_START_LEVEL`.
 - Hold: `held` guarda solo el tipo (la pieza vuelve sin rotar vía `makePiece(type)`) y `holdUsed` lo bloquea hasta el siguiente fijado. `holdPiece()` también llama a `spawn()` en el primer hold, por eso el desbloqueo vive en `lockPiece()` y no en `spawn()`.
-- El overlay (`#overlay`) se reutiliza para PAUSA y GAME OVER cambiando `#overlay-title`/`#overlay-score` y la clase `hidden`.
+- El overlay (`#overlay`) se reutiliza para PAUSA y GAME OVER vía `showOverlay(title, text, isPause)` / `hideOverlay()`: en pausa muestra `#pause-menu` (Reanudar, Reiniciar, Ver controles, Nivel inicial) y oculta `#restart-btn`; en game over al revés. `hideOverlay()` hace `blur()` del elemento con foco para que Space/Enter/flechas no reactiven el menú.
+- Teclado: `P`/`Escape` alternan la pausa (sus repeticiones se ignoran; en game over no hacen nada). Con el menú abierto el `keydown` ignora el resto de teclas. `hideOverlay()` (al reanudar y en `init()`) vacía `freshKeys`; las repeticiones (`e.repeat`) de teclas que no se hayan vuelto a pulsar desde entonces se ignoran, así una tecla mantenida desde antes no mueve la pieza al volver.
 
 ## Acoplamientos a tener en cuenta
 
 - Tamaño del canvas `#board` en `index.html` debe ser `COLS*BLOCK × ROWS*BLOCK` (300×600 por defecto).
 - `drawPreview()` (usado por `drawNext()` y `drawHold()`) asume una rejilla 4×4 de 30 px → `#next-canvas` y `#hold-canvas` son 120×120.
-- Los controles están documentados en tres sitios: el `keydown` de `game.js`, la lista `.controls` de `index.html` y la tabla del README. Mantenlos sincronizados.
+- Los controles están documentados en tres sitios: el `keydown` de `game.js`, la lista `#controls-list` de `index.html` (el menú de pausa copia su contenido en `#pause-controls` al cargar) y la tabla del README. Mantenlos sincronizados.
