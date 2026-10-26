@@ -27,6 +27,26 @@ const COLORS_LIGHT = [
   '#ef6c00', // L
 ];
 
+// El tablero neón es negro en ambos temas (CSS), así que las dos paletas son la misma
+const NEON_COLORS = [null, '#00f0ff', '#fff200', '#d000ff', '#39ff14', '#ff2a55', '#2f6bff', '#ff8c00'];
+
+// Skins: paletas por tema (mismos índices que PIECES) y cómo se pinta un bloque.
+// draw(context, px, py, size, color) recibe la esquina en píxeles; drawBlock() gestiona el alpha.
+const SKINS = {
+  retro: { colors: COLORS, colorsLight: COLORS_LIGHT, draw: drawRetroBlock },
+  neon: { colors: NEON_COLORS, colorsLight: NEON_COLORS, draw: drawNeonBlock },
+  pastel: {
+    colors: [null, '#a8e6f0', '#fdf1a8', '#d9b8f0', '#b8e8c0', '#f6b8c0', '#b8cdf6', '#fcd2a8'],
+    colorsLight: [null, '#7fcfdc', '#f2d16b', '#c39be0', '#8fd19c', '#ee9aa6', '#93aee8', '#f5b47f'],
+    draw: drawPastelBlock,
+  },
+  pixel: {
+    colors: [null, '#00b8f8', '#f8d800', '#b048f8', '#58d854', '#f83800', '#3878f8', '#f89000'],
+    colorsLight: [null, '#0088cc', '#e0a800', '#9030d8', '#38b838', '#d82800', '#2058d8', '#e87800'],
+    draw: drawPixelBlock,
+  },
+};
+
 const PIECES = [
   null,
   [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], // I
@@ -68,9 +88,12 @@ const recordsEl = document.getElementById('records');
 const recordsBody = document.getElementById('records-body');
 const recordsStats = document.getElementById('records-stats');
 const resetRecordsBtn = document.getElementById('reset-records-btn');
+const skinSelect = document.getElementById('skin-select');
 
 const THEME_KEY = 'tetris-theme';
 let theme = 'dark';
+const SKIN_KEY = 'tetris-skin';
+let skin = 'retro';
 
 const START_LEVEL_KEY = 'tetris-start-level';
 const MAX_START_LEVEL = 10; // debe coincidir con las opciones de #start-level
@@ -235,14 +258,69 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = (theme === 'light' ? COLORS_LIGHT : COLORS)[colorIndex];
+  const s = SKINS[skin];
+  const color = (theme === 'light' ? s.colorsLight : s.colors)[colorIndex];
   context.globalAlpha = alpha ?? 1;
+  s.draw(context, x * size, y * size, size, color);
+  context.globalAlpha = 1;
+}
+
+function drawRetroBlock(context, px, py, size, color) {
   context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+  context.fillRect(px + 1, py + 1, size - 2, size - 2);
   // highlight
   context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  context.globalAlpha = 1;
+  context.fillRect(px + 1, py + 1, size - 2, 4);
+}
+
+function drawNeonBlock(context, px, py, size, color) {
+  context.fillStyle = color + '33'; // relleno translúcido (#rrggbbaa)
+  context.fillRect(px + 3, py + 3, size - 6, size - 6);
+  context.shadowColor = color;
+  context.shadowBlur = size / 3;
+  context.strokeStyle = color;
+  context.lineWidth = 2;
+  context.strokeRect(px + 4, py + 4, size - 8, size - 8);
+  // El contexto es compartido: sin esto la rejilla y el resto de dibujos también brillarían
+  context.shadowBlur = 0;
+}
+
+// Esquinas redondeadas con arcTo (sin depender de roundRect)
+function drawPastelBlock(context, px, py, size, color) {
+  const x = px + 2, y = py + 2, w = size - 4, r = size / 4;
+  context.fillStyle = color;
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.arcTo(x + w, y, x + w, y + w, r);
+  context.arcTo(x + w, y + w, x, y + w, r);
+  context.arcTo(x, y + w, x, y, r);
+  context.arcTo(x, y, x + w, y, r);
+  context.closePath();
+  context.fill();
+  context.fillStyle = 'rgba(255,255,255,0.45)';
+  context.beginPath();
+  context.arc(x + w * 0.3, y + w * 0.3, size / 9, 0, Math.PI * 2);
+  context.fill();
+}
+
+// Bisel claro arriba/izquierda, oscuro abajo/derecha y diagonales de "píxeles" de size/10 px
+function drawPixelBlock(context, px, py, size, color) {
+  const p = Math.max(2, Math.round(size / 10));
+  const n = Math.floor(size / p);
+  context.fillStyle = color;
+  context.fillRect(px, py, size, size);
+  context.fillStyle = 'rgba(255,255,255,0.5)';
+  context.fillRect(px, py, size, p);
+  context.fillRect(px, py, p, size);
+  context.fillStyle = 'rgba(0,0,0,0.4)';
+  context.fillRect(px, py + size - p, size, p);
+  context.fillRect(px + size - p, py, p, size);
+  context.fillStyle = 'rgba(0,0,0,0.2)';
+  for (let i = 1; i < n - 1; i++)
+    for (let j = 1; j < n - 1; j++)
+      if ((i + j) % 4 === 0) context.fillRect(px + i * p, py + j * p, p, p);
+  context.fillStyle = 'rgba(255,255,255,0.7)';
+  context.fillRect(px + 2 * p, py + 2 * p, p, p);
 }
 
 function drawGrid() {
@@ -496,6 +574,8 @@ document.addEventListener('keydown', e => {
   }
   // Con el menú abierto el juego ignora el teclado (Space/Enter siguen accionando el botón con foco)
   if (paused || gameOver) return;
+  // Jugando, flechas y Space van al juego aunque el selector de skin tenga el foco (p. ej. cerrado con Escape)
+  if (e.target === skinSelect && /^(Arrow|Space$)/.test(e.code)) { e.preventDefault(); skinSelect.blur(); }
   if (e.repeat && !freshKeys.has(e.code)) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -581,6 +661,27 @@ themeToggle.addEventListener('click', () => {
 let savedTheme = null;
 try { savedTheme = localStorage.getItem(THEME_KEY); } catch (e) { /* ignorar */ }
 setTheme(savedTheme, false);
+
+// Nombre desconocido o sin guardar → retro; data-skin activa las variables CSS de la skin
+function setSkin(name, persist) {
+  skin = Object.prototype.hasOwnProperty.call(SKINS, name) ? name : 'retro';
+  document.documentElement.dataset.skin = skin;
+  skinSelect.value = skin;
+  if (persist) {
+    try { localStorage.setItem(SKIN_KEY, skin); } catch (e) { /* almacenamiento no disponible */ }
+  }
+  // En pausa o game over el bucle está cancelado: repintar manualmente
+  if (board && current && next) { draw(); drawNext(); drawHold(); }
+}
+
+skinSelect.addEventListener('change', () => {
+  setSkin(skinSelect.value, true);
+  skinSelect.blur(); // evita que las flechas cambien la skin mientras se juega
+});
+
+let savedSkin = null;
+try { savedSkin = localStorage.getItem(SKIN_KEY); } catch (e) { /* ignorar */ }
+setSkin(savedSkin, false);
 
 records = loadRecords();
 init();

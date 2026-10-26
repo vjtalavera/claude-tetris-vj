@@ -62,11 +62,33 @@ body {
   margin-bottom: 16px;
 }
 
-/* ---- Toggle de tema ---- */
-#theme-toggle {
+/* Skin neón: tablero y vistas previas negros también en modo claro (va tras el tema claro para ganarle) */
+:root[data-skin="neon"] {
+  --grid: #16162a;
+}
+
+:root[data-skin="neon"] #board,
+:root[data-skin="neon"] #next-canvas,
+:root[data-skin="neon"] #hold-canvas {
+  background: #000;
+  border-color: #2a2a4a;
+}
+
+:root[data-skin="neon"] #board {
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.25);
+}
+
+/* ---- Selector de skin y toggle de tema ---- */
+.top-bar {
   position: fixed;
   top: 12px;
   right: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+#skin-select,
+#theme-toggle {
   background: var(--panel-bg);
   color: var(--text);
   border: 1px solid var(--border);
@@ -77,6 +99,7 @@ body {
   cursor: pointer;
 }
 
+#skin-select:hover,
 #theme-toggle:hover {
   border-color: var(--accent);
 }
