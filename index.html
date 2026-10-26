@@ -7,7 +7,15 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <button id="theme-toggle" type="button" role="switch" aria-checked="false">Modo claro</button>
+  <div class="top-bar">
+    <select id="skin-select" aria-label="Apariencia de las piezas" title="Apariencia de las piezas">
+      <option value="retro">Retro</option>
+      <option value="neon">Neón</option>
+      <option value="pastel">Pastel</option>
+      <option value="pixel">Pixel art</option>
+    </select>
+    <button id="theme-toggle" type="button" role="switch" aria-checked="false">Modo claro</button>
+  </div>
 
   <h1 class="title">TETRIS</h1>
 

@@ -419,3 +419,62 @@ test('pantalla de inicio: el juego espera a Jugar y el teclado se ignora en un I
   run("documentListeners.keydown({ code: 'ArrowLeft', target: { tagName: 'BODY' }, preventDefault() {} })");
   assert.equal(run('current.x'), 3);
 });
+
+test('cada skin tiene paleta oscura y clara coherentes con PIECES', () => {
+  const run = loadGame();
+  const n = run('PIECES.length');
+  const names = run('Object.keys(SKINS)');
+  assert.deepEqual(names, ['retro', 'neon', 'pastel', 'pixel']);
+  const select = html.match(/<select[^>]*id="skin-select"[\s\S]*?<\/select>/)[0];
+  const options = [...select.matchAll(/<option value="(\w+)"/g)].map(m => m[1]);
+  assert.deepEqual(options, names, '#skin-select debe ofrecer exactamente las skins de SKINS');
+  assert.equal(run('SKINS.retro.colors === COLORS && SKINS.retro.colorsLight === COLORS_LIGHT'), true);
+  for (const name of names) {
+    assert.equal(run(`typeof SKINS.${name}.draw`), 'function');
+    for (const palette of ['colors', 'colorsLight']) {
+      const colors = run(`SKINS.${name}.${palette}`);
+      assert.equal(colors.length, n, `${name}.${palette} debe tener un color por tipo de pieza`);
+      assert.equal(colors[0], null);
+      for (let t = 1; t < n; t++) assert.match(colors[t], /^#[0-9a-f]{6}$/i, `${name}.${palette}[${t}]`);
+    }
+  }
+});
+
+test('setSkin() valida el nombre, marca el documento y persiste la preferencia', () => {
+  const storage = memoryStorage();
+  const run = loadGame({ storage });
+  assert.equal(run('skin'), 'retro', 'sin preferencia guardada arranca en retro');
+  assert.equal(storage.data['tetris-skin'], undefined, 'cargar la preferencia no la escribe');
+
+  run("setSkin('neon', true)");
+  assert.equal(run('skin'), 'neon');
+  assert.equal(run('document.documentElement.dataset.skin'), 'neon');
+  assert.equal(run('skinSelect.value'), 'neon');
+  assert.equal(storage.data['tetris-skin'], 'neon');
+
+  run("setSkin('xxx', true)");
+  assert.equal(run('skin'), 'retro');
+  assert.equal(storage.data['tetris-skin'], 'retro');
+  run("setSkin('toString')");
+  assert.equal(run('skin'), 'retro', 'solo claves propias de SKINS');
+});
+
+test('la skin guardada se aplica al cargar', () => {
+  assert.equal(loadGame({ storage: memoryStorage({ 'tetris-skin': 'pixel' }) })('skin'), 'pixel');
+  assert.equal(loadGame({ storage: memoryStorage({ 'tetris-skin': 'nope' }) })('skin'), 'retro');
+});
+
+test('drawBlock() funciona con todas las skins y no deja glow ni alpha activos', () => {
+  const run = loadGame();
+  for (const name of run('Object.keys(SKINS)')) {
+    for (const t of ['dark', 'light']) {
+      run(`setSkin('${name}'); setTheme('${t}')`);
+      for (const alpha of [undefined, 0.2, 0.3]) {
+        assert.doesNotThrow(() => run(`drawBlock(ctx, 2, 3, 7, BLOCK, ${alpha}); drawBlock(nextCtx, 1, 1, 1, 30, ${alpha})`));
+        assert.equal(run('ctx.globalAlpha'), 1, `${name}/${t}: globalAlpha restaurado`);
+        assert.equal(run("'shadowBlur' in ctx ? ctx.shadowBlur : 0"), 0, `${name}/${t}: sin shadowBlur residual`);
+      }
+      assert.doesNotThrow(() => run('draw(); drawNext(); drawHold()'));
+    }
+  }
+});
